@@ -1,0 +1,1378 @@
+classdef splinesoasis < matlab.apps.AppBase
+
+    % Properties that correspond to app components
+    properties (Access = public)
+        UIFigure               matlab.ui.Figure
+        TabGroup               matlab.ui.container.TabGroup
+        WelcometoOASISTab      matlab.ui.container.Tab
+        OASIS                  matlab.ui.control.Image
+        ButtonInformation      matlab.ui.control.Button
+        ButtonGuide            matlab.ui.control.Button
+        ButtonInformationShow  matlab.ui.control.Button
+        ButtonGuideShow        matlab.ui.control.Button
+        BuySeedsTab            matlab.ui.container.Tab
+        TablePointsValue1      matlab.ui.control.Table
+        ButtonAuto             matlab.ui.control.Button
+        LabelPointsAuto        matlab.ui.control.Label
+        ButtonTipsAuto         matlab.ui.control.Button
+        OASIS1                 matlab.ui.control.Image
+        ButtonTipsAutoShow     matlab.ui.control.Button
+        OASISOASIS1            matlab.ui.control.Image
+        PlantSeedsTab          matlab.ui.container.Tab
+        TablePointsValue2      matlab.ui.control.Table
+        LabelPointsHandy       matlab.ui.control.Label
+        ButtonTipsHandy        matlab.ui.control.Button
+        OASIS2                 matlab.ui.control.Image
+        Label                  matlab.ui.control.Label
+        EditNumber             matlab.ui.control.NumericEditField
+        ButtonTipsHandyShow    matlab.ui.control.Button
+        OASISOASIS2            matlab.ui.control.Image
+        ButtonOK               matlab.ui.control.Button
+        WateringTab            matlab.ui.container.Tab
+        Definition             matlab.ui.control.Image
+        ButtonTipsWater        matlab.ui.control.Button
+        Label_2                matlab.ui.control.Label
+        EditFore               matlab.ui.control.NumericEditField
+        Label_3                matlab.ui.control.Label
+        EditAft                matlab.ui.control.NumericEditField
+        LabelFit               matlab.ui.control.Label
+        ButtonTipsWaterShow    matlab.ui.control.Button
+        OASISOASIS3            matlab.ui.control.Image
+        FertilizingTab         matlab.ui.container.Tab
+        q1EditFieldLabel       matlab.ui.control.Label
+        Editq1                 matlab.ui.control.NumericEditField
+        qnEditFieldLabel       matlab.ui.control.Label
+        Editqn                 matlab.ui.control.NumericEditField
+        SLabel                 matlab.ui.control.Label
+        EditS0                 matlab.ui.control.NumericEditField
+        Image                  matlab.ui.control.Image
+        ButtonTipsF            matlab.ui.control.Button
+        ButtonAdvance          matlab.ui.control.Button
+        TableWi                matlab.ui.control.Table
+        LabelWi                matlab.ui.control.Label
+        LabelSmooth            matlab.ui.control.Label
+        LabelW1Wn              matlab.ui.control.Label
+        EditW                  matlab.ui.control.NumericEditField
+        LabelW                 matlab.ui.control.Label
+        ButtonTipsFShow        matlab.ui.control.Button
+        OASISOASIS4            matlab.ui.control.Image
+        OASISTab               matlab.ui.container.Tab
+        FinalAxes              matlab.ui.control.UIAxes
+        TableFinal             matlab.ui.control.Table
+        ButtonShowData         matlab.ui.control.Button
+        ButtonShowPoints       matlab.ui.control.Button
+        ButtonShowFit          matlab.ui.control.Button
+        ButtonTipsFinal        matlab.ui.control.Button
+        ButtonClear            matlab.ui.control.Button
+        OASIS3                 matlab.ui.control.Image
+        OASIS4                 matlab.ui.control.Image
+        ButtonShowSmooth       matlab.ui.control.Button
+        ButtonTipsFinalShow    matlab.ui.control.Button
+        OASISOASIS5            matlab.ui.control.Image
+    end
+
+    
+    properties (Access = public)
+        
+        %%%%%%%%%%%%%%%%%%%%%%%%%%   数据处理   %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        x = [];% 存储型值x的列向量 n×1
+        y = [];% 存储型值y的列向量 n×1
+        s = [];% 排序用临时向量 n×1
+        ind0 = [];% 排序用位置向量 n×1
+        n = 3 ; %型值点个数
+        
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%   自动   %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        ChosenFile='';% 自动输入模式的选择文件名
+        ChosenPath='';% 自动输入模式的选择路径
+        Chosen='';% 自动输入模式的选择路径+文件名
+        
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%   手动   %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        ind = [0,0]; % 二元行向量，储存手动输入发生的位置
+        % ta = table; % 存储输入变量
+        
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%   拟合   %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        theta = 45;% 角度制初始进流角
+        fi = 45; % 角度制初始去流角
+        k1 = 1; % 初始首斜率
+        kn = -1; % 初始尾斜率
+        a = [];% 系数a0,a1,a2...an,an+1的系数列向量，(n+2)×1
+        a0=[]; % 存储拟合后初始向量
+        M = [];% Ma=y,求解系数列向量所用矩阵,(n+2)×(n+2)
+        xf = []; % 绘图用x
+        yf = []; % 绘图用y
+        pp;  % 存储分段多项式的结构体
+        
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%   光顺   %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        q1 = 1000; % 光顺首斜率权因子
+        qn = 1000; % 光顺尾斜率权因子
+        S0 = 1; % 初始光顺权因子
+        S; % 光顺权因子
+        Wi = []; % 各型值点偏离权因子列向量
+        indW = [0,1]; % 存储Wi交互编辑发生位置
+        %——————————————————————————A矩阵————————————————————————%
+        SWF = []; % Sum(Wi.Fxi),即PPT上的A矩阵，也就是偏离权矩阵，(n+2)*(n+2)方阵，各列值相同。
+        Mn=[]; % n*(n+2)矩阵，拟合中M矩阵的前n行向量
+        MW=[]; % n*(n+2)矩阵，但Mn中每个元素已经点乘了W
+        %——————————————————————————B矩阵————————————————————————%
+        Q=[]; % 斜率权矩阵，(n+2)*(n+2)方阵，即PPT上B矩阵
+        Q1=[];% 首斜率权矩阵
+        QN=[];% 尾斜率权矩阵
+        QNR=[]; % 尾斜率辅助行向量1*(n+2)
+        QNC=[]; % 尾斜率辅助列向量(n+2)*1
+        %——————————————————————————F矩阵————————————————————————%
+        Wy =[];% （n+2）*1的列向量,第i个值为Wiyi点乘
+        SWy = [] ; % 是SWF（PPT上A）矩阵对应的最右常数项（n+2）*1的列向量
+        Qy = [];% 斜率权因子Q（PPT上B）矩阵对应的最右常数项（n+2）*1的列向量
+        FIN=[];% Qy+SWy,（n+2）*1的列向量
+        %——————————————————————————S矩阵————————————————————————%
+        SA=[];% 光顺权矩阵，(n+2)*(n+2)方阵，部分对角阵
+        TOT=[]; % 总系数矩阵，PPT上的A+B+S,这里的SWF+Q+S
+        yg=[]; % 光顺后型值;n*1向量；
+        %——————————————————————————循环—————————————————————————%
+        dd=[]; % n*1列向量，第i个值为xi处的二阶导数
+        flagS = [];% (n-2)*1 bool矩阵，小波动判别
+        flagB = [];% (n-3)*1 bool矩阵，大波动判别
+        flag = false;
+        %——————————————————————————画图—————————————————————————%
+        xs=[]; % 用于画线的加密x
+        ys=[]; % 用于画线的加密y
+       
+        
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%   调试   %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        % fxi=[]; % 存储f(x)向量i
+        % x0=[]; % 将第1型值点坐标平移到原点后的x坐标向量
+        % y0=[]; % 将第1型值点坐标平移到原点后的y坐标向量
+        % f = []; % 调试用
+
+    end
+
+    
+    
+    
+    methods (Access=public)
+        function z = zpower(~,x1,x2,q)
+            % 正power函数
+            if x1 <= x2
+                z = 0;
+            else
+                z = (x1-x2).^q;
+            end
+        end
+        
+        
+        function Var2SolveA(app)
+            %% 求解系数列向量所用矩阵的组成列向量
+            app.M = zeros(app.n+2);
+            % 先定义n×(n+2)
+            app.M(1:app.n,1) = ones(app.n,1); % 前n行的第1列a0
+            for j=1:app.n % 前n行的第2列a1
+                app.M(j,2) = app.x(j);
+            end
+            for j=1:app.n % 前n行的第3列a2
+                app.M(j,3) = app.x(j)^2;
+            end
+            for j=1:app.n % 前n行的第4列a3
+                app.M(j,4) = app.x(j)^3;
+            end
+            for k=5:app.n+2 % 前n行的第5至n+2列
+                for j=1:app.n
+                    app.M(j,k)= zpower(app,app.x(j),app.x(k-3),3);
+                end
+            end
+            % 再定义n+1行
+            app.M(app.n+1,2)=1;
+            app.M(app.n+1,3)=2*app.x(1);
+            app.M(app.n+1,4)=3*app.x(1)^2;
+            % 最后定义n+2行
+            app.M(app.n+2,2)=1;
+            app.M(app.n+2,3)=2*app.x(app.n);
+            app.M(app.n+2,4)=3*app.x(app.n)^2;
+            for j = 5:app.n+2
+                app.M(app.n+2,j) = zpower(app,app.x(app.n),app.x(j-3),2);
+            end
+        end    
+        
+        
+        function fxi=F(app) % 求f(xi)数组
+            fxi=zeros(app.n,1);
+            fxi(1)=app.a(1)+app.a(2).*app.x(1)+app.a(3).*app.x(1).^2+app.a(4).*app.x(1).^3;
+            fxi(2)=app.a(1)+app.a(2).*app.x(2)+app.a(3).*app.x(2).^2+app.a(4).*app.x(2).^3;
+            for i = 3:app.n
+                fxi(i)=app.a(1)+app.a(2).*app.x(i)+app.a(3).*app.x(i).^2+app.a(4).*app.x(i).^3;
+                for j = 2:i-1
+                    fxi(i)=fxi(i)+app.a(j+3).*(app.x(i)-app.x(j)).^3;
+                end
+            end
+        end
+  
+        
+        function ys=X2Y(app)
+            ys=zeros(length(app.xs),1);
+            for i = 1:length(app.xs)
+                if app.xs(i)<=app.x(2)
+                    ys(i) = app.a(1)+app.a(2).*app.xs(i)+app.a(3).*app.xs(i).^2+app.a(4).*app.xs(i).^3;
+                else
+                    ys(i) = app.a(1)+app.a(2).*app.xs(i)+app.a(3).*app.xs(i).^2+app.a(4).*app.xs(i).^3;
+                    for j = 2:app.n-1
+                        ys(i) = ys(i)+app.a(j+3).*zpower(app,app.xs(i),app.x(j),3);
+                    end
+                end
+            end
+        end
+        
+    
+        function dkn =KndAk(app,k) % df'n/dak
+            if k == 1
+                dkn = 1;
+            elseif k == 2
+                dkn = 2.*app.x(app.n);
+            elseif k == 3
+                dkn = 3.*app.x(app.n).^2;
+            elseif ismember(k,4:app.n+1)==1
+                dkn = 3.*(app.x(app.n)-app.x(k-2)).^2;
+            else
+                dkn=0;
+            end
+        end
+        
+        
+        function dd=YDDX(app)
+            dd=zeros(app.n,1);
+            dd(1)=2.*app.a(3)+6.*app.a(4).*app.x(1);
+            dd(1)=2.*app.a(3)+6.*app.a(4).*app.x(2);
+            for i=3:app.n
+                dd(i)=2.*app.a(3)+6.*app.a(4).*app.x(i);
+                for j = 2:i-1
+                    dd(i)=dd(i)+6.*app.a(j+3).*(app.x(i)-app.x(j));
+                end
+            end
+        end   
+    end
+
+    % Callbacks that handle component events
+    methods (Access = private)
+
+        % Button pushed function: ButtonAuto
+        function ButtonAutoPushed(app, event)
+            % 文件读取型值点
+            app.x=[];
+            app.y=[];
+            [app.ChosenFile,app.ChosenPath]=uigetfile; % UI交互选择文件名以及路径
+            app.Chosen=fullfile(app.ChosenPath,app.ChosenFile);% 防止在其他文件路径
+            [app.x,app.y]=readvars(app.Chosen); % 按路径把所选文件前两列导入x,y
+            % app.TablePointsValue1=uitable(app.BuySeedsTab,"Data",[app.x,app.y],"Position",[450,200,300,400],"ColumnName",['x';'y'],);
+            app.TablePointsValue1.Data = [app.x,app.y];
+            app.TablePointsValue1.ColumnEditable = true;
+            app.n = length(app.x);
+            app.Wi = [1000;ones(app.n-2,1);1000]; % Wi初始化
+            % 边界条件初始化
+            app.k1=(app.y(2)-app.y(1))/(app.x(2)-app.x(1));
+            app.kn=(app.y(app.n)-app.y(app.n-1))/(app.x(app.n)-app.x(app.n-1));
+            app.theta = fix(atand(app.k1)); % 朝0取整避免90°
+            app.fi = -fix(atand(app.kn));
+            % 调整区间到0-180
+            if app.theta <0 
+                app.theta = app.theta + 180;
+            end
+            if app.fi <0
+                app.fi = app.fi + 180;
+            end
+            % 调整预设垂直向到80/100
+            if app.theta>80 && app.theta <= 90
+                app.theta = 80;
+                app.k1 = tand(80);
+            elseif app.theta>90 && app.theta < 100
+                app.theta = 100;
+                app.k1 = tand(100);
+            end
+            if app.fi > 80 && app.fi <= 90
+                app.fi = 80;
+                app.kn = -tand(80);
+            elseif app.fi > 90 && app.fi < 100
+                app.fi = 100;
+                app.kn = -tand(100);
+            end
+            app.EditFore.Value = app.theta;
+            app.EditAft.Value = app.fi;
+        end
+
+        % Button pushed function: ButtonInformation
+        function ButtonInformationPushed(app, event)
+            app.ButtonInformationShow.Visible = true;
+            app.ButtonGuide.Visible = false;
+            app.ButtonInformation.Visible = false;
+        end
+
+        % Button pushed function: ButtonInformationShow
+        function ButtonInformationShowPushed(app, event)
+            app.ButtonInformationShow.Visible = false;
+            app.ButtonGuide.Visible = true;
+            app.ButtonInformation.Visible = true;
+        end
+
+        % Button pushed function: ButtonGuide
+        function ButtonGuidePushed(app, event)
+            app.ButtonGuideShow.Visible = true;
+            app.ButtonGuide.Visible = false;
+            app.ButtonInformation.Visible = false;
+        end
+
+        % Button pushed function: ButtonGuideShow
+        function ButtonGuideShowPushed(app, event)
+            app.ButtonGuideShow.Visible = false;
+            app.ButtonGuide.Visible = true;
+            app.ButtonInformation.Visible = true;
+        end
+
+        % Button pushed function: ButtonTipsAutoShow
+        function ButtonTipsAutoShowPushed(app, event)
+            app.ButtonTipsAutoShow.Visible = false;
+            app.OASISOASIS1.Visible = false;
+            app.ButtonTipsAuto.Visible = true;
+        end
+
+        % Button pushed function: ButtonTipsAuto
+        function ButtonTipsAutoPushed(app, event)
+            app.ButtonTipsAuto.Visible = false;
+            app.OASISOASIS1.Visible = true;
+            app.ButtonTipsAutoShow.Visible = true;
+        end
+
+        % Button pushed function: ButtonTipsHandy
+        function ButtonTipsHandyPushed(app, event)
+            app.ButtonTipsHandy.Visible = false;
+            app.OASISOASIS2.Visible = true;
+            app.ButtonTipsHandyShow.Visible = true;
+            app.ButtonOK.Visible = false;
+        end
+
+        % Button pushed function: ButtonTipsHandyShow
+        function ButtonTipsHandyShowPushed(app, event)
+            app.ButtonTipsHandyShow.Visible = false;
+            app.OASISOASIS2.Visible = false;
+            app.ButtonTipsHandy.Visible = true;
+            app.ButtonOK.Visible = true;
+        end
+
+        % Value changed function: EditNumber
+        function EditNumberValueChanged(app, event)
+            % 手动输入型值点个数时的初始化
+            app.x=[];
+            app.y=[];
+            app.n = app.EditNumber.Value;
+            app.x=zeros([app.n,1]); % x初始化
+            app.y=zeros([app.n,1]); % y初始化
+            app.TablePointsValue2.Data = [app.x,app.y];
+            app.Wi = [1000;ones(app.n-2,1);1000]; % Wi初始化
+            % app.ta = table('Size',[app.n,2],'VariableTypes',{'cell','cell'});
+            % app.TablePointsValue2.Data = app.ta;
+        end
+
+        % Button pushed function: ButtonShowData
+        function ButtonShowDataPushed(app, event)
+            % 显示最后的确认型值
+            [app.s,app.ind0] = sort(app.x); % 强制排序
+            app.x = app.s;
+            for j = 1:length(app.y)
+                app.s(j) = app.y(app.ind0(j));
+            end
+            app.y = app.s;% 强制排序
+            app.yg = zeros(app.n,1);
+            app.TableFinal.Data = [app.x,app.y,app.yg]; 
+        end
+
+        % Button pushed function: ButtonShowPoints
+        function ButtonShowPointsPushed(app, event)
+            % 绘制型值散点图
+            scatter(app.FinalAxes,app.x,app.y,21,'rx','DisplayName','原型值点');
+            hold(app.FinalAxes,"on");
+            legend(app.FinalAxes,"AutoUpdate","on");
+        end
+
+        % Cell edit callback: TablePointsValue2
+        function TablePointsValue2CellEdit(app, event)
+            % 手动输入型值时的型值更改
+            app.ind = event.Indices;
+            if app.ind(2) == 1
+                app.x(app.ind(1)) = event.NewData;
+            else
+                app.y(app.ind(1)) = event.NewData;
+            end
+            [app.s,app.ind0] = sort(app.x); % 强制排序开始
+            app.x = app.s;
+            for j = 1:length(app.y)
+                app.s(j) = app.y(app.ind0(j));
+            end
+            app.y = app.s;% 强制排序结束
+            app.TablePointsValue2.Data = [app.x,app.y];
+        end
+
+        % Cell edit callback: TablePointsValue1
+        function TablePointsValue1CellEdit(app, event)
+            % 自动输入型值时的型值更改
+            app.ind = event.Indices;
+            if app.ind(2) == 1
+                app.x(app.ind(1)) = event.NewData;
+            else
+                app.y(app.ind(1)) = event.NewData;
+            end    
+            [app.s,app.ind0] = sort(app.x); % 强制排序
+            app.x = app.s;
+            for j = 1:length(app.y)
+                app.s(j) = app.y(app.ind0(j));
+            end
+            app.y = app.s;% 强制排序
+            app.TablePointsValue1.Data = [app.x,app.y];
+        end
+
+        % Button pushed function: ButtonShowFit
+        function ButtonShowFitPushed(app, event)
+            % 拟合出三次样条，并计算出列向量
+            
+            %%%%%%%%%%%%%%%%%%% 我的拟合 %%%%%%%%%%%%%%%%%%%
+            
+            % Var2SolveA(app); % 求系数向量所用M矩阵
+            % app.yi = [app.y;app.k1;app.kn]; % 广义y向量
+            % app.a = app.M\app.yi; % 求系数向量a
+            % 这里调试过，结果和下面调库是完全一致的。为了提高算法效率，我就直接调库了
+            
+            %%%%%%%%%%%%%%%%%% 调库真香 %%%%%%%%%%%%%%%%%%%%
+            
+            app.a=zeros(app.n,1);
+            
+            % 调库插值并算出分段函数
+            app.pp = spline(app.x,[app.k1;app.y;app.kn]); %你看看这就一句话的事
+            
+            % 拟合作图
+            app.xf = linspace(app.x(1),app.x(app.n),1000);
+            app.yf = ppval(app.pp,app.xf);
+            plot(app.FinalAxes,app.xf,app.yf,'-',"Color",[0,1,0],"LineWidth",0.2,"Visible","on",'DisplayName','拟合曲线');
+            hold(app.FinalAxes,'on');
+            
+            % 换算PPT中的系数列向量a[]与调库所得分段函数的次数参数
+            app.a(4)=app.pp.coefs(1,1); % a3= a
+            app.a(3)=app.pp.coefs(1,2)-3.*app.pp.coefs(1,1).*app.x(1);
+            app.a(2)=app.pp.coefs(1,3)-2.*app.pp.coefs(1,2).*app.x(1)+3.*app.pp.coefs(1,1).*(app.x(1).^2);
+            app.a(1)=app.pp.coefs(1,4) - app.pp.coefs(1,3).*app.x(1) + app.pp.coefs(1,2).*(app.x(1).^2) - app.pp.coefs(1,1).*(app.x(1).^3);
+            for j=5:app.n+2
+                app.a(j)=app.pp.coefs(j-3,1)-app.pp.coefs(j-4,1);
+            end
+            app.a=reshape(app.a,app.n+2,1); % 转为列向量
+            app.a0 = app.a; % 防止拟合值丢失
+            % disp(app.a) % 调试用
+            % disp(app.pp.coefs);调试用
+            legend(app.FinalAxes,"AutoUpdate","on");
+        end
+
+        % Button pushed function: ButtonClear
+        function ButtonClearPushed(app, event)
+            % 清空坐标区
+            cla(app.FinalAxes);
+        end
+
+        % Button pushed function: ButtonAdvance
+        function ButtonAdvancePushed(app, event)
+            % 高级光顺设置的前端更改与Wi输入
+            if app.TableWi.Visible == true  % 从高级光顺回到默认光顺条件
+                app.TableWi.Visible = false;
+                app.LabelWi.Visible = false;
+                app.LabelW1Wn.Visible = true;
+                app.EditW.Visible = true;
+                app.LabelW.Visible = true;
+                app.ButtonAdvance.Text = '高级光顺';
+                app.Wi = [1000;ones(app.n-2,1);1000];% 返回Wi默认光顺条件
+                app.EditW.Value = 1; % 返回Wi默认光顺条件
+            else                            % 从默认光顺回到初始光顺条件
+                app.TableWi.Visible = true; 
+                app.LabelWi.Visible = true;
+                app.LabelW1Wn.Visible = false;
+                app.EditW.Visible = false;
+                app.LabelW.Visible = false;
+                app.ButtonAdvance.Text = '默认光顺';
+                app.Wi=ones(app.n,1); % 初始化高级光顺条件；
+                app.TableWi.Data = app.Wi; % UI交互初始化；
+                app.TableWi.ColumnEditable = true; % 可交互编辑
+                app.TableWi.ColumnSortable = false; % 不可排序
+            end
+        end
+
+        % Value changed function: EditFore
+        function EditForeValueChanged(app, event)
+            % 设置进流角边界条件；
+            app.theta = app.EditFore.Value;
+            app.k1 = tand(app.theta);
+        end
+
+        % Value changed function: EditAft
+        function EditAftValueChanged(app, event)
+            % 设置去流角边界条件；
+            app.fi = app.EditAft.Value;
+            app.kn = -tand(app.fi);
+        end
+
+        % Value changed function: Editq1
+        function Editq1ValueChanged(app, event)
+            % 自主定义q1,默认值为1000
+            app.q1 = app.Editq1.Value;
+        end
+
+        % Value changed function: Editqn
+        function EditqnValueChanged(app, event)
+            % 自主定义q1,默认值为1000
+            app.qn = app.Editqn.Value;         
+        end
+
+        % Value changed function: EditS0
+        function EditS0ValueChanged(app, event)
+            % 自主定义S,默认值为1
+            app.S0 = app.EditS0.Value;
+        end
+
+        % Value changed function: EditW
+        function EditWValueChanged(app, event)
+            for j = 2:app.n-1
+                app.Wi(j) = app.EditW.Value;
+            end      
+        end
+
+        % Cell edit callback: TableWi
+        function TableWiCellEdit(app, event)
+            % UI交互改变高级光顺条件（改变Wi权因子）
+            app.indW = event.Indices;
+            app.Wi(app.indW(1)) = event.NewData;
+        end
+
+        % Button pushed function: ButtonShowSmooth
+        function ButtonShowSmoothPushed(app, event)
+            %%%%%%%%%%%%%%%%%%%%%%%%  先定义A矩阵（SWF矩阵） %%%%%%%%%%%%%%%%%%%%%%%%%
+            Var2SolveA(app); % 调出M
+            app.Mn = app.M(1:app.n,:);
+            app.MW = app.Wi.*app.Mn;
+            app.SWF=zeros(app.n+2); %初始化
+            for j = 1:app.n+2
+                app.SWF(j,:)=sum(app.MW.*app.Mn(:,j),1);
+            end
+            %%%%%%%%%%%%%%%%%%%%%%%%  再定义B矩阵（Q矩阵） %%%%%%%%%%%%%%%%%%%%%%%%%
+            app.Q1 = zeros(app.n+2); % 初始化首斜率
+            app.QN = zeros(app.n+2); % 初始化尾斜率
+            app.QNR = zeros(1,app.n+2); %初始化尾斜率辅助行向量
+            app.QNC = zeros(app.n+2,1); %初始化尾斜率辅助列向量
+            % Q1赋值
+            app.Q1(2,2)=app.q1;
+            app.Q1(2,3)=2.*app.q1.*app.x(1);
+            app.Q1(2,4)=3.*app.q1.*app.x(1).^2;
+            app.Q1(3,2)=2.*app.q1.*app.x(1);
+            app.Q1(3,3)=4.*app.q1.*app.x(1).^2;
+            app.Q1(3,4)=6.*app.q1.*app.x(1).^3;
+            app.Q1(4,2)=3.*app.q1.*app.x(1).^2;
+            app.Q1(4,3)=6.*app.q1.*app.x(1).^3;
+            app.Q1(4,4)=9.*app.q1.*app.x(1).^4;
+            % disp(app.Q1); % 调试用
+            % QN赋值
+            for k =0:app.n+1
+                app.QNC(k+1)=KndAk(app,k).*app.qn;
+            end
+            app.QNR(2)=1;
+            app.QNR(3)=2.*app.x(app.n);
+            app.QNR(4)=3.*app.x(app.n).^2;
+            for i = 5:app.n+2
+                app.QNR(i)=3.*(app.x(app.n)-app.x(i-3)).^2;
+            end
+            app.QN=app.QNC.*app.QNR;
+            app.Q=app.Q1+app.QN;
+            % 调试用 disp(app.Q);
+            %%%%%%%%%%%%%%%%%%%%%%%%  再定义F矩阵（FIN矩阵） %%%%%%%%%%%%%%%%%%%%%%%%%
+            app.SWy = zeros(app.n+2,1);
+            for i = 1:app.n+2
+                app.SWy(i) = sum(app.Wi.*app.y.*app.Mn(:,i));
+            end
+            % 先计算QyN
+            app.Qy = zeros(app.n+2,1);
+            for k =0:app.n+1
+                app.Qy(k+1)=KndAk(app,k).*app.kn.*app.qn;
+            end
+            % 再加上Qy1
+            app.Qy(2)=app.Qy(2)+app.q1.*app.k1;
+            app.Qy(3)=app.Qy(3)+2.*app.q1.*app.k1.*app.x(1);
+            app.Qy(4)=app.Qy(4)+3.*app.q1.*app.k1.*app.x(1).^2;
+            app.FIN=app.SWy+app.Qy;
+            %%%%%%%%%%%%%%%%%%%%%%%%  最后定义S矩阵（SA矩阵）并循环判断 %%%%%%%%%%%%%%%%%%%%%%%%%
+            app.SA=zeros(app.n+2);
+            app.S= 0.5.*app.S0;
+            app.flag = false;
+            while app.flag == false
+                app.S=2.*app.S;
+                for i = 5:app.n+2
+                    app.SA(i,i)=app.S;
+                end
+                app.TOT=app.SWF+app.Q+app.SA;
+                app.a=app.TOT\app.FIN;
+                
+                % 得到a后，初始dd，开始判别
+                app.dd=YDDX(app); 
+                app.flagS = [];
+                app.flagB = [];
+     
+                % 小判别
+                for i = 2:app.n-1
+                    if app.dd(i-1)*app.dd(i)<0 && app.dd(i)*app.dd(i+1)<0 == true
+                        app.flagS(i-1) = false;
+                    else
+                        app.flagS(i-1) = true;
+                    end
+                end
+                
+                % 大判别
+                if app.n == 3
+                    app.flagB(1)=true;
+                else
+                    for i = 3:app.n-1
+                        if app.dd(i-1)*app.dd(i-2)<0 && app.dd(i-1)*app.dd(i)>0 && app.dd(i+1)*app.dd(i)<0 ==true
+                            app.flag(i-2) = false;
+                        else
+                            app.flag(i-2) = true;
+                        end
+                    end
+                end
+                app.flag = all(app.flagS) && all(app.flagB);
+            end
+            %%%%%%%%%%%%%%%%%%%%%%%%%%%%       画点       %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+            app.yg = F(app);
+            app.TableFinal.Data = [app.x,app.y,app.yg]; 
+            scatter(app.FinalAxes,app.x,app.yg,21,'ro','DisplayName','光顺型值点');
+            hold(app.FinalAxes,"on");
+            app.EditS0.Value = app.S;
+            %%%%%%%%%%%%%%%%%%%%%%%%%%%%       画线       %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+            app.xs = linspace(app.x(1),app.x(app.n),1000);
+            app.ys = X2Y(app);
+            plot(app.FinalAxes,app.xs,app.ys,'--',"Color",[0 0.4 1],"LineWidth",0.2,"Visible","on",'DisplayName','光顺曲线');
+            hold(app.FinalAxes,"on");
+            legend(app.FinalAxes,"AutoUpdate",'on');
+        end
+
+        % Button pushed function: ButtonOK
+        function ButtonOKPushed(app, event)
+            % 边界条件初始化
+            app.k1=(app.y(2)-app.y(1))/(app.x(2)-app.x(1));
+            app.kn=(app.y(app.n)-app.y(app.n-1))/(app.x(app.n)-app.x(app.n-1));
+            app.theta = fix(atand(app.k1)); % 朝0取整避免90°
+            app.fi = -fix(atand(app.kn));
+            if app.theta <0
+                app.theta = app.theta + 180;
+            end
+            if app.fi <0
+                app.fi = app.fi + 180;
+            end
+            app.EditFore.Value = app.theta;
+            app.EditAft.Value = app.fi;
+        end
+
+        % Button pushed function: ButtonTipsWater
+        function ButtonTipsWaterPushed(app, event)
+            app.ButtonTipsWaterShow.Visible = true;
+            app.OASISOASIS3.Visible = true;
+        end
+
+        % Button pushed function: ButtonTipsWaterShow
+        function ButtonTipsWaterShowPushed(app, event)
+            app.ButtonTipsWaterShow.Visible = false;
+            app.OASISOASIS3.Visible = false;
+        end
+
+        % Button pushed function: ButtonTipsF
+        function ButtonTipsFPushed(app, event)
+            app.ButtonTipsFShow.Visible = true;
+            app.OASISOASIS4.Visible = true;
+        end
+
+        % Button pushed function: ButtonTipsFShow
+        function ButtonTipsFShowPushed(app, event)
+            app.ButtonTipsFShow.Visible = false;
+            app.OASISOASIS4.Visible = false;
+        end
+
+        % Button pushed function: ButtonTipsFinal
+        function ButtonTipsFinalPushed(app, event)
+            app.ButtonTipsFinalShow.Visible = true;
+            app.OASISOASIS5.Visible = true;            
+        end
+
+        % Button pushed function: ButtonTipsFinalShow
+        function ButtonTipsFinalShowPushed(app, event)
+            app.ButtonTipsFinalShow.Visible = false;
+            app.OASISOASIS5.Visible = false;
+        end
+
+        % Image clicked function: OASISOASIS2
+        function OASISOASIS2ImageClicked(app, event)
+            app.ButtonTipsHandyShow.Visible = false;
+            app.OASISOASIS2.Visible = false;
+            app.ButtonTipsHandy.Visible = true;
+            app.ButtonOK.Visible = true;
+        end
+
+        % Image clicked function: OASISOASIS1
+        function OASISOASIS1ImageClicked(app, event)
+            app.ButtonTipsAutoShow.Visible = false;
+            app.OASISOASIS1.Visible = false;
+        end
+
+        % Image clicked function: OASISOASIS3
+        function OASISOASIS3ImageClicked(app, event)
+            app.ButtonTipsWaterShow.Visible = false;
+            app.OASISOASIS3.Visible = false;
+        end
+
+        % Image clicked function: OASISOASIS4
+        function OASISOASIS4ImageClicked(app, event)
+            app.ButtonTipsFShow.Visible = false;
+            app.OASISOASIS4.Visible = false;
+        end
+
+        % Image clicked function: OASISOASIS5
+        function OASISOASIS5ImageClicked(app, event)
+            app.ButtonTipsFinalShow.Visible = false;
+            app.OASISOASIS5.Visible = false;
+        end
+    end
+
+    % Component initialization
+    methods (Access = private)
+
+        % Create UIFigure and components
+        function createComponents(app)
+
+            % Create UIFigure and hide until all components are created
+            app.UIFigure = uifigure('Visible', 'off');
+            app.UIFigure.Color = [0.902 0.902 0.902];
+            app.UIFigure.Position = [210 100 1200 675];
+            app.UIFigure.Name = 'MATLAB App';
+            app.UIFigure.Scrollable = 'on';
+
+            % Create TabGroup
+            app.TabGroup = uitabgroup(app.UIFigure);
+            app.TabGroup.Position = [0 0 1200 675];
+
+            % Create WelcometoOASISTab
+            app.WelcometoOASISTab = uitab(app.TabGroup);
+            app.WelcometoOASISTab.Tooltip = {''};
+            app.WelcometoOASISTab.Title = 'Welcome to OASIS';
+
+            % Create OASIS
+            app.OASIS = uiimage(app.WelcometoOASISTab);
+            app.OASIS.ScaleMethod = 'fill';
+            app.OASIS.Position = [133 153 400 378];
+            app.OASIS.ImageSource = 'OASIS灰色.png';
+
+            % Create ButtonInformation
+            app.ButtonInformation = uibutton(app.WelcometoOASISTab, 'push');
+            app.ButtonInformation.ButtonPushedFcn = createCallbackFcn(app, @ButtonInformationPushed, true);
+            app.ButtonInformation.Tag = 'inputexcel';
+            app.ButtonInformation.FontName = 'Century Gothic';
+            app.ButtonInformation.FontSize = 21;
+            app.ButtonInformation.FontWeight = 'bold';
+            app.ButtonInformation.FontColor = [0.502 0.502 0.502];
+            app.ButtonInformation.Tooltip = {'可以从Excel文件导入型值数据'};
+            app.ButtonInformation.Position = [716 393 242 72];
+            app.ButtonInformation.Text = 'Hey there！';
+
+            % Create ButtonGuide
+            app.ButtonGuide = uibutton(app.WelcometoOASISTab, 'push');
+            app.ButtonGuide.ButtonPushedFcn = createCallbackFcn(app, @ButtonGuidePushed, true);
+            app.ButtonGuide.Tag = 'inputexcel';
+            app.ButtonGuide.FontName = 'Century Gothic';
+            app.ButtonGuide.FontSize = 21;
+            app.ButtonGuide.FontWeight = 'bold';
+            app.ButtonGuide.FontColor = [0.502 0.502 0.502];
+            app.ButtonGuide.Tooltip = {'可以从Excel文件导入型值数据'};
+            app.ButtonGuide.Position = [716 221 242 72];
+            app.ButtonGuide.Text = 'Tell me how to use it';
+
+            % Create ButtonInformationShow
+            app.ButtonInformationShow = uibutton(app.WelcometoOASISTab, 'push');
+            app.ButtonInformationShow.ButtonPushedFcn = createCallbackFcn(app, @ButtonInformationShowPushed, true);
+            app.ButtonInformationShow.Tag = 'inputexcel';
+            app.ButtonInformationShow.BackgroundColor = [0.9412 0.9412 0.9412];
+            app.ButtonInformationShow.FontName = 'Century Gothic';
+            app.ButtonInformationShow.FontSize = 21;
+            app.ButtonInformationShow.FontWeight = 'bold';
+            app.ButtonInformationShow.FontColor = [0.502 0.502 0.502];
+            app.ButtonInformationShow.Visible = 'off';
+            app.ButtonInformationShow.Tooltip = {''};
+            app.ButtonInformationShow.Position = [539 152 595 378];
+            app.ButtonInformationShow.Text = {'APP：SPLINESOASIS'; 'AUTHOR ：张子文'; 'VERSION：2.1    '; ''; 'POWERED BY：'; 'Matlab® App Designer'; '& Microsoft® Visual Studio Code'; '& Python'; ''; 'Named after the OASIS Music Festival，'; 'held in Nov. 2019 in SJTU,'; 'organized by me & my friends in the Art Center.'; 'OASIS is the largest school rock show all over China.'};
+
+            % Create ButtonGuideShow
+            app.ButtonGuideShow = uibutton(app.WelcometoOASISTab, 'push');
+            app.ButtonGuideShow.ButtonPushedFcn = createCallbackFcn(app, @ButtonGuideShowPushed, true);
+            app.ButtonGuideShow.Tag = 'inputexcel';
+            app.ButtonGuideShow.BackgroundColor = [0.9412 0.9412 0.9412];
+            app.ButtonGuideShow.FontName = '华文中宋';
+            app.ButtonGuideShow.FontSize = 21;
+            app.ButtonGuideShow.FontColor = [0.502 0.502 0.502];
+            app.ButtonGuideShow.Visible = 'off';
+            app.ButtonGuideShow.Tooltip = {'单击即可返回'};
+            app.ButtonGuideShow.Position = [492 93 671 511];
+            app.ButtonGuideShow.Text = {'【Seeds】 种子是就是原始型值啦！'; 'Buy就是自动获取种子！是从读取型值数据功能的页面'; 'Plant就是自己种出来了hhh所以这是手动输入型值的页面'; ''; '【Watering】 种子浇水才能长大，设置2个边界条件才能拟合_'; '所以这是一个设置拟合边界条件的界面'; ''; '【Fertiliziing】施肥是非必须的'; '但是为了种子长得更好更符合我们的期望——'; '就需要对光顺的各类初始条件进行调整'; ''; '【OASIS!】ooops！长出了一片绿洲！'; '——拟合与光顺曲线以及其他相关数据'; ''; '详细操作见各页Tips'; '欢迎建设你的绿洲 :)'};
+
+            % Create BuySeedsTab
+            app.BuySeedsTab = uitab(app.TabGroup);
+            app.BuySeedsTab.Title = 'Buy Seeds';
+
+            % Create TablePointsValue1
+            app.TablePointsValue1 = uitable(app.BuySeedsTab);
+            app.TablePointsValue1.ColumnName = {'x'; 'y'};
+            app.TablePointsValue1.ColumnSortable = true;
+            app.TablePointsValue1.ColumnEditable = true;
+            app.TablePointsValue1.CellEditCallback = createCallbackFcn(app, @TablePointsValue1CellEdit, true);
+            app.TablePointsValue1.Tooltip = {'当前型值点数据'};
+            app.TablePointsValue1.Tag = 'handy';
+            app.TablePointsValue1.FontName = 'Century Gothic';
+            app.TablePointsValue1.Position = [585 77 435 544];
+
+            % Create ButtonAuto
+            app.ButtonAuto = uibutton(app.BuySeedsTab, 'push');
+            app.ButtonAuto.ButtonPushedFcn = createCallbackFcn(app, @ButtonAutoPushed, true);
+            app.ButtonAuto.Tag = 'inputexcel';
+            app.ButtonAuto.FontName = '华文中宋';
+            app.ButtonAuto.FontSize = 21;
+            app.ButtonAuto.FontColor = [0.502 0.502 0.502];
+            app.ButtonAuto.Tooltip = {'可以从文档/表格文件中导入型值数据'};
+            app.ButtonAuto.Position = [238 126 187 70];
+            app.ButtonAuto.Text = '文件导入型值';
+
+            % Create LabelPointsAuto
+            app.LabelPointsAuto = uilabel(app.BuySeedsTab);
+            app.LabelPointsAuto.HorizontalAlignment = 'center';
+            app.LabelPointsAuto.FontName = '华文中宋';
+            app.LabelPointsAuto.FontSize = 18;
+            app.LabelPointsAuto.Position = [746 39 114 24];
+            app.LabelPointsAuto.Text = '当前型值数据';
+
+            % Create ButtonTipsAuto
+            app.ButtonTipsAuto = uibutton(app.BuySeedsTab, 'push');
+            app.ButtonTipsAuto.ButtonPushedFcn = createCallbackFcn(app, @ButtonTipsAutoPushed, true);
+            app.ButtonTipsAuto.Tag = 'inputexcel';
+            app.ButtonTipsAuto.FontName = 'Times New Roman';
+            app.ButtonTipsAuto.FontSize = 21;
+            app.ButtonTipsAuto.FontWeight = 'bold';
+            app.ButtonTipsAuto.FontColor = [0.702 0.902 0.502];
+            app.ButtonTipsAuto.Tooltip = {'单击显示本页的详细操作说明'};
+            app.ButtonTipsAuto.Position = [60 548 110 54];
+            app.ButtonTipsAuto.Text = 'TIPS';
+
+            % Create OASIS1
+            app.OASIS1 = uiimage(app.BuySeedsTab);
+            app.OASIS1.Position = [180 223 300 300];
+            app.OASIS1.ImageSource = 'OASIS表格用.png';
+
+            % Create ButtonTipsAutoShow
+            app.ButtonTipsAutoShow = uibutton(app.BuySeedsTab, 'push');
+            app.ButtonTipsAutoShow.ButtonPushedFcn = createCallbackFcn(app, @ButtonTipsAutoShowPushed, true);
+            app.ButtonTipsAutoShow.Tag = 'inputexcel';
+            app.ButtonTipsAutoShow.FontName = '华文中宋';
+            app.ButtonTipsAutoShow.FontSize = 21;
+            app.ButtonTipsAutoShow.Visible = 'off';
+            app.ButtonTipsAutoShow.Tooltip = {'单击即可返回'};
+            app.ButtonTipsAutoShow.Position = [69 20 1063 606];
+            app.ButtonTipsAutoShow.Text = {'WoW欢迎来到Buy Seeds界面！'; '这个界面其实非常简单！你看下方有个按钮，点它就完了。'; ''; '但是！你有一些前期需要准备的工作！'; '1.如果你是文档类文件/等间距文本文件：'; '请在第1竖排输入型值点的x坐标，第2竖排输入型值点的y坐标。'; '2.如果你是表格类/数组类的文件：'; '请在前两列分别输入x与y的坐标值。'; '（无论你第一行有无文本标题，程序都可以接受。）'; '注意！！目前本程序也只支持以上两种文件格式的自动型值输入。'; ''; '此外，因为型值点常常是数值有序的，程序还提供排序功能：'; '光标置于第一行的时候旁边会出现排序按钮，点击即可将乱序数据从小到大排列。'; '（当然，如果你没这么做，后面为了可以进行拟合和光顺，我也会强制帮你排哈哈哈）'; ''; '自动输入完成之后可以直接在表格中单击单元格进行型值的编辑修改。'; '一旦修改，所有型值数据也会自动重新按x升序有序排列。'; ''; '（单击即可退出，随后想看再按TIPS即可）'};
+
+            % Create OASISOASIS1
+            app.OASISOASIS1 = uiimage(app.BuySeedsTab);
+            app.OASISOASIS1.ImageClickedFcn = createCallbackFcn(app, @OASISOASIS1ImageClicked, true);
+            app.OASISOASIS1.Visible = 'off';
+            app.OASISOASIS1.Position = [337 106 507 467];
+            app.OASISOASIS1.ImageSource = 'OASIS表格用.png';
+
+            % Create PlantSeedsTab
+            app.PlantSeedsTab = uitab(app.TabGroup);
+            app.PlantSeedsTab.Title = 'Plant Seeds';
+
+            % Create TablePointsValue2
+            app.TablePointsValue2 = uitable(app.PlantSeedsTab);
+            app.TablePointsValue2.ColumnName = {'x'; 'y'};
+            app.TablePointsValue2.ColumnSortable = true;
+            app.TablePointsValue2.ColumnEditable = true;
+            app.TablePointsValue2.CellEditCallback = createCallbackFcn(app, @TablePointsValue2CellEdit, true);
+            app.TablePointsValue2.Tooltip = {'当前型值点数据'};
+            app.TablePointsValue2.Tag = 'handy';
+            app.TablePointsValue2.FontName = 'Century Gothic';
+            app.TablePointsValue2.Position = [585 77 435 544];
+
+            % Create LabelPointsHandy
+            app.LabelPointsHandy = uilabel(app.PlantSeedsTab);
+            app.LabelPointsHandy.HorizontalAlignment = 'center';
+            app.LabelPointsHandy.FontName = '华文中宋';
+            app.LabelPointsHandy.FontSize = 18;
+            app.LabelPointsHandy.Position = [746 39 114 24];
+            app.LabelPointsHandy.Text = '当前型值数据';
+
+            % Create ButtonTipsHandy
+            app.ButtonTipsHandy = uibutton(app.PlantSeedsTab, 'push');
+            app.ButtonTipsHandy.ButtonPushedFcn = createCallbackFcn(app, @ButtonTipsHandyPushed, true);
+            app.ButtonTipsHandy.FontName = 'Times New Roman';
+            app.ButtonTipsHandy.FontSize = 21;
+            app.ButtonTipsHandy.FontWeight = 'bold';
+            app.ButtonTipsHandy.FontColor = [0.702 0.902 0.502];
+            app.ButtonTipsHandy.Tooltip = {'单击显示本页的详细操作说明'};
+            app.ButtonTipsHandy.Position = [60 548 110 54];
+            app.ButtonTipsHandy.Text = 'TIPS';
+
+            % Create OASIS2
+            app.OASIS2 = uiimage(app.PlantSeedsTab);
+            app.OASIS2.Position = [180 255 300 300];
+            app.OASIS2.ImageSource = 'OASIS表格用.png';
+
+            % Create Label
+            app.Label = uilabel(app.PlantSeedsTab);
+            app.Label.BackgroundColor = [0.9412 0.9412 0.9412];
+            app.Label.HorizontalAlignment = 'right';
+            app.Label.FontName = '华文中宋';
+            app.Label.FontSize = 21;
+            app.Label.FontColor = [0.502 0.502 0.502];
+            app.Label.Position = [243 210 174 30];
+            app.Label.Text = '请输入型值点个数';
+
+            % Create EditNumber
+            app.EditNumber = uieditfield(app.PlantSeedsTab, 'numeric');
+            app.EditNumber.Limits = [3 Inf];
+            app.EditNumber.ValueChangedFcn = createCallbackFcn(app, @EditNumberValueChanged, true);
+            app.EditNumber.HorizontalAlignment = 'center';
+            app.EditNumber.FontName = 'Times New Roman';
+            app.EditNumber.FontSize = 21;
+            app.EditNumber.FontColor = [0.502 0.502 0.502];
+            app.EditNumber.BackgroundColor = [0.9804 0.9804 0.9804];
+            app.EditNumber.Tooltip = {'请输入一个正整数'};
+            app.EditNumber.Position = [240 155 185 48];
+            app.EditNumber.Value = 3;
+
+            % Create ButtonTipsHandyShow
+            app.ButtonTipsHandyShow = uibutton(app.PlantSeedsTab, 'push');
+            app.ButtonTipsHandyShow.ButtonPushedFcn = createCallbackFcn(app, @ButtonTipsHandyShowPushed, true);
+            app.ButtonTipsHandyShow.FontName = '华文中宋';
+            app.ButtonTipsHandyShow.FontSize = 21;
+            app.ButtonTipsHandyShow.Visible = 'off';
+            app.ButtonTipsHandyShow.Tooltip = {'单击即可退出'};
+            app.ButtonTipsHandyShow.Position = [85 10 1039 627];
+            app.ButtonTipsHandyShow.Text = {'欢迎来到Plant Seeds界面！'; ''; '听说每年坚持自己播种的都是勤劳的人，坚持手动输入型值的也是orz'; ''; '如果你确定要这样做，请你首先在左侧框中输入你要写进的型值点个数。'; '型值点个数一定要是正整数噢！不能只有0.666个型值否则运行不出来。'; ''; '然后右侧表格中将会出现相应行数的空单元格，'; '你可以直接在单元格中输入型值数据。'; '单元格中的型值请一定要输入数值（而不是文本之类乱七八糟的东西），否则也会运行不出来！'; ''; '手动输入完所有型值之后，如果输错了（......大概率事件！）'; '你可以直接在表格中单击单元格进行型值的编辑修改。'; '此外，由于型线的型值是数值有序的，而输入数据却有可能是乱序的——'; '本程序还提供排序功能：程序会自动将输入乱序数据从小到大按x升序排列。'; ''; '最后，请单击【输入完成】按钮！会完成边界条件初始化。'; '（悄悄地说其实你不点也没关系，你可以在后一页自己手动输入）'; '（再悄悄地说其实你下一页不输入也没关系反正我一定会让程序跑起来哈哈哈）'; '所以说OASIS总有一棵适合你的树:)'; ''; '（单击即可退出，随后想看再按TIPS即可）'};
+
+            % Create OASISOASIS2
+            app.OASISOASIS2 = uiimage(app.PlantSeedsTab);
+            app.OASISOASIS2.ImageClickedFcn = createCallbackFcn(app, @OASISOASIS2ImageClicked, true);
+            app.OASISOASIS2.Visible = 'off';
+            app.OASISOASIS2.Position = [337 106 507 467];
+            app.OASISOASIS2.ImageSource = 'OASIS表格用.png';
+
+            % Create ButtonOK
+            app.ButtonOK = uibutton(app.PlantSeedsTab, 'push');
+            app.ButtonOK.ButtonPushedFcn = createCallbackFcn(app, @ButtonOKPushed, true);
+            app.ButtonOK.FontName = '华文中宋';
+            app.ButtonOK.FontSize = 21;
+            app.ButtonOK.FontColor = [0.502 0.502 0.502];
+            app.ButtonOK.Position = [242 87 182 46];
+            app.ButtonOK.Text = '输入完成';
+
+            % Create WateringTab
+            app.WateringTab = uitab(app.TabGroup);
+            app.WateringTab.Title = 'Watering';
+
+            % Create Definition
+            app.Definition = uiimage(app.WateringTab);
+            app.Definition.Position = [100 211 1003 378];
+            app.Definition.ImageSource = '迎流角去流角.png';
+
+            % Create ButtonTipsWater
+            app.ButtonTipsWater = uibutton(app.WateringTab, 'push');
+            app.ButtonTipsWater.ButtonPushedFcn = createCallbackFcn(app, @ButtonTipsWaterPushed, true);
+            app.ButtonTipsWater.Tag = 'inputexcel';
+            app.ButtonTipsWater.FontName = 'Times New Roman';
+            app.ButtonTipsWater.FontSize = 21;
+            app.ButtonTipsWater.FontWeight = 'bold';
+            app.ButtonTipsWater.FontColor = [0.702 0.902 0.502];
+            app.ButtonTipsWater.Tooltip = {'单击显示本页的详细操作说明'};
+            app.ButtonTipsWater.Position = [254 73 115 54];
+            app.ButtonTipsWater.Text = 'TIPS';
+
+            % Create Label_2
+            app.Label_2 = uilabel(app.WateringTab);
+            app.Label_2.BackgroundColor = [0.9412 0.9412 0.9412];
+            app.Label_2.HorizontalAlignment = 'center';
+            app.Label_2.FontName = '华文中宋';
+            app.Label_2.FontSize = 21;
+            app.Label_2.FontColor = [0.502 0.502 0.502];
+            app.Label_2.Position = [513 103 184 30];
+            app.Label_2.Text = '请输入迎流角θ/° ';
+
+            % Create EditFore
+            app.EditFore = uieditfield(app.WateringTab, 'numeric');
+            app.EditFore.Limits = [0 180];
+            app.EditFore.ValueChangedFcn = createCallbackFcn(app, @EditForeValueChanged, true);
+            app.EditFore.HorizontalAlignment = 'center';
+            app.EditFore.FontName = 'Times New Roman';
+            app.EditFore.FontSize = 21;
+            app.EditFore.FontColor = [0.502 0.502 0.502];
+            app.EditFore.BackgroundColor = [0.9804 0.9804 0.9804];
+            app.EditFore.Tooltip = {'请输入一个正整数'};
+            app.EditFore.Position = [506 48 185 48];
+            app.EditFore.Value = 45;
+
+            % Create Label_3
+            app.Label_3 = uilabel(app.WateringTab);
+            app.Label_3.BackgroundColor = [0.9412 0.9412 0.9412];
+            app.Label_3.HorizontalAlignment = 'center';
+            app.Label_3.FontName = '华文中宋';
+            app.Label_3.FontSize = 21;
+            app.Label_3.FontColor = [0.502 0.502 0.502];
+            app.Label_3.Position = [738 103 185 30];
+            app.Label_3.Text = '请输入去流角∅/° ';
+
+            % Create EditAft
+            app.EditAft = uieditfield(app.WateringTab, 'numeric');
+            app.EditAft.Limits = [0 180];
+            app.EditAft.ValueChangedFcn = createCallbackFcn(app, @EditAftValueChanged, true);
+            app.EditAft.HorizontalAlignment = 'center';
+            app.EditAft.FontName = 'Times New Roman';
+            app.EditAft.FontSize = 21;
+            app.EditAft.FontColor = [0.502 0.502 0.502];
+            app.EditAft.BackgroundColor = [0.9804 0.9804 0.9804];
+            app.EditAft.Tooltip = {'请输入一个正整数'};
+            app.EditAft.Position = [731 46 185 48];
+            app.EditAft.Value = 45;
+
+            % Create LabelFit
+            app.LabelFit = uilabel(app.WateringTab);
+            app.LabelFit.FontName = '华文中宋';
+            app.LabelFit.FontSize = 21;
+            app.LabelFit.Position = [650 144 132 30];
+            app.LabelFit.Text = '拟合边界条件';
+
+            % Create ButtonTipsWaterShow
+            app.ButtonTipsWaterShow = uibutton(app.WateringTab, 'push');
+            app.ButtonTipsWaterShow.ButtonPushedFcn = createCallbackFcn(app, @ButtonTipsWaterShowPushed, true);
+            app.ButtonTipsWaterShow.Tag = 'inputexcel';
+            app.ButtonTipsWaterShow.FontName = '华文中宋';
+            app.ButtonTipsWaterShow.FontSize = 21;
+            app.ButtonTipsWaterShow.FontColor = [0.502 0.502 0.502];
+            app.ButtonTipsWaterShow.Visible = 'off';
+            app.ButtonTipsWaterShow.Tooltip = {'单击可返回'};
+            app.ButtonTipsWaterShow.Position = [81 39 1034 576];
+            app.ButtonTipsWaterShow.Text = {'欢迎前来浇水！'; ''; '这是一个设置边界条件的界面'; '众所周知样条拟合需要两个额外的边界条件'; '（如果你不知道请可参考计算书2333）'; '在船体型线中这两个条件就是进流角和去流角啦'; '他们的定义和方向参考本页配图'; '（在家画图没有数位板也太难了orz！）'; ''; '从数学本质上来说，其实就是要满足两端第二类边界条件（即一阶导数为给定值）'; '如果你按要求“买了”或者“种了”种子，这里应该会出现两个默认的边界条件'; '它们是我给你算好的进流角与去流角（计算方式详见计算书）'; '但是如果你设计上有确定的进流角和去流角，你可以再将它们自行修改为更精确的设计值。'; '（如果你的设计值与我算出的默认值有较大出入，说明首尾有剧烈变化没有在型值表中体现出来哦）'; ''; '总而言之，这是一个非常简单的页面'; '确认我的默认边界条件 或者 自行输入你所设计的进流角和去流角 就好啦！'; ''; '（单击即可退出，再按TIPS可重新查看）'};
+
+            % Create OASISOASIS3
+            app.OASISOASIS3 = uiimage(app.WateringTab);
+            app.OASISOASIS3.ImageClickedFcn = createCallbackFcn(app, @OASISOASIS3ImageClicked, true);
+            app.OASISOASIS3.Visible = 'off';
+            app.OASISOASIS3.Position = [337 106 507 467];
+            app.OASISOASIS3.ImageSource = 'OASIS表格用.png';
+
+            % Create FertilizingTab
+            app.FertilizingTab = uitab(app.TabGroup);
+            app.FertilizingTab.Title = 'Fertilizing';
+
+            % Create q1EditFieldLabel
+            app.q1EditFieldLabel = uilabel(app.FertilizingTab);
+            app.q1EditFieldLabel.HorizontalAlignment = 'center';
+            app.q1EditFieldLabel.FontName = '华文中宋';
+            app.q1EditFieldLabel.FontSize = 21;
+            app.q1EditFieldLabel.FontColor = [0.502 0.502 0.502];
+            app.q1EditFieldLabel.Position = [488 463 221 30];
+            app.q1EditFieldLabel.Text = '请设置首斜率权因子q1';
+
+            % Create Editq1
+            app.Editq1 = uieditfield(app.FertilizingTab, 'numeric');
+            app.Editq1.Limits = [0 Inf];
+            app.Editq1.ValueChangedFcn = createCallbackFcn(app, @Editq1ValueChanged, true);
+            app.Editq1.HorizontalAlignment = 'center';
+            app.Editq1.FontName = 'Times New Roman';
+            app.Editq1.FontSize = 21;
+            app.Editq1.FontColor = [0.502 0.502 0.502];
+            app.Editq1.Position = [514 410 179 44];
+            app.Editq1.Value = 1000;
+
+            % Create qnEditFieldLabel
+            app.qnEditFieldLabel = uilabel(app.FertilizingTab);
+            app.qnEditFieldLabel.HorizontalAlignment = 'right';
+            app.qnEditFieldLabel.FontName = '华文中宋';
+            app.qnEditFieldLabel.FontSize = 21;
+            app.qnEditFieldLabel.FontColor = [0.502 0.502 0.502];
+            app.qnEditFieldLabel.Position = [488 339 222 30];
+            app.qnEditFieldLabel.Text = '请设置尾斜率权因子qn';
+
+            % Create Editqn
+            app.Editqn = uieditfield(app.FertilizingTab, 'numeric');
+            app.Editqn.Limits = [0 Inf];
+            app.Editqn.ValueChangedFcn = createCallbackFcn(app, @EditqnValueChanged, true);
+            app.Editqn.HorizontalAlignment = 'center';
+            app.Editqn.FontName = 'Times New Roman';
+            app.Editqn.FontSize = 21;
+            app.Editqn.FontColor = [0.502 0.502 0.502];
+            app.Editqn.Position = [514 292 179 44];
+            app.Editqn.Value = 1000;
+
+            % Create SLabel
+            app.SLabel = uilabel(app.FertilizingTab);
+            app.SLabel.BackgroundColor = [0.9412 0.9412 0.9412];
+            app.SLabel.HorizontalAlignment = 'right';
+            app.SLabel.FontName = '华文中宋';
+            app.SLabel.FontSize = 21;
+            app.SLabel.FontColor = [0.502 0.502 0.502];
+            app.SLabel.Position = [169 461 125 30];
+            app.SLabel.Text = '光顺权因子S';
+
+            % Create EditS0
+            app.EditS0 = uieditfield(app.FertilizingTab, 'numeric');
+            app.EditS0.Limits = [1 Inf];
+            app.EditS0.ValueChangedFcn = createCallbackFcn(app, @EditS0ValueChanged, true);
+            app.EditS0.HorizontalAlignment = 'center';
+            app.EditS0.FontName = 'Times New Roman';
+            app.EditS0.FontSize = 21;
+            app.EditS0.FontColor = [0.502 0.502 0.502];
+            app.EditS0.BackgroundColor = [0.9804 0.9804 0.9804];
+            app.EditS0.Tooltip = {'请输入一个正整数'};
+            app.EditS0.Position = [147 409 173 46];
+            app.EditS0.Value = 1;
+
+            % Create Image
+            app.Image = uiimage(app.FertilizingTab);
+            app.Image.Position = [746 138 402 370];
+            app.Image.ImageSource = 'OASIS灰色.png';
+
+            % Create ButtonTipsF
+            app.ButtonTipsF = uibutton(app.FertilizingTab, 'push');
+            app.ButtonTipsF.ButtonPushedFcn = createCallbackFcn(app, @ButtonTipsFPushed, true);
+            app.ButtonTipsF.Tag = 'inputexcel';
+            app.ButtonTipsF.FontName = 'Times New Roman';
+            app.ButtonTipsF.FontSize = 21;
+            app.ButtonTipsF.FontWeight = 'bold';
+            app.ButtonTipsF.FontColor = [0.702 0.902 0.502];
+            app.ButtonTipsF.Tooltip = {'单击显示本页的详细操作说明'};
+            app.ButtonTipsF.Position = [90 297 115 54];
+            app.ButtonTipsF.Text = 'TIPS';
+
+            % Create ButtonAdvance
+            app.ButtonAdvance = uibutton(app.FertilizingTab, 'push');
+            app.ButtonAdvance.ButtonPushedFcn = createCallbackFcn(app, @ButtonAdvancePushed, true);
+            app.ButtonAdvance.Tag = 'inputexcel';
+            app.ButtonAdvance.FontName = '华文中宋';
+            app.ButtonAdvance.FontSize = 21;
+            app.ButtonAdvance.FontColor = [0.9412 0.0745 0.0745];
+            app.ButtonAdvance.Tooltip = {'单击显示高级光顺设置'};
+            app.ButtonAdvance.Position = [257 297 115 54];
+            app.ButtonAdvance.Text = '高级光顺';
+
+            % Create TableWi
+            app.TableWi = uitable(app.FertilizingTab);
+            app.TableWi.ColumnName = {'Wi'};
+            app.TableWi.ColumnEditable = true;
+            app.TableWi.CellEditCallback = createCallbackFcn(app, @TableWiCellEdit, true);
+            app.TableWi.Visible = 'off';
+            app.TableWi.FontName = 'Century Gothic';
+            app.TableWi.Position = [869 79 158 447];
+
+            % Create LabelWi
+            app.LabelWi = uilabel(app.FertilizingTab);
+            app.LabelWi.FontName = '华文中宋';
+            app.LabelWi.FontSize = 21;
+            app.LabelWi.Visible = 'off';
+            app.LabelWi.Position = [847 551 201 30];
+            app.LabelWi.Text = '设置非均一偏离权Wi';
+
+            % Create LabelSmooth
+            app.LabelSmooth = uilabel(app.FertilizingTab);
+            app.LabelSmooth.HorizontalAlignment = 'center';
+            app.LabelSmooth.FontName = '华文中宋';
+            app.LabelSmooth.FontSize = 21;
+            app.LabelSmooth.Position = [523 524 160 28];
+            app.LabelSmooth.Text = '光顺条件';
+
+            % Create LabelW1Wn
+            app.LabelW1Wn = uilabel(app.FertilizingTab);
+            app.LabelW1Wn.HorizontalAlignment = 'center';
+            app.LabelW1Wn.FontName = '华文中宋';
+            app.LabelW1Wn.FontSize = 21;
+            app.LabelW1Wn.FontColor = [0.502 0.502 0.502];
+            app.LabelW1Wn.Position = [129 167 216 84];
+            app.LabelW1Wn.Text = {'默认首尾端点为固定端'; '偏离权因子为1000'; '可在高级光顺中修改'};
+
+            % Create EditW
+            app.EditW = uieditfield(app.FertilizingTab, 'numeric');
+            app.EditW.Limits = [1 Inf];
+            app.EditW.ValueChangedFcn = createCallbackFcn(app, @EditWValueChanged, true);
+            app.EditW.HorizontalAlignment = 'center';
+            app.EditW.FontName = 'Times New Roman';
+            app.EditW.FontSize = 21;
+            app.EditW.FontColor = [0.502 0.502 0.502];
+            app.EditW.Position = [514 156 177 40];
+            app.EditW.Value = 1;
+
+            % Create LabelW
+            app.LabelW = uilabel(app.FertilizingTab);
+            app.LabelW.HorizontalAlignment = 'center';
+            app.LabelW.FontName = '华文中宋';
+            app.LabelW.FontSize = 21;
+            app.LabelW.FontColor = [0.502 0.502 0.502];
+            app.LabelW.Position = [482 200 238 56];
+            app.LabelW.Text = {'请设置均一偏离权因子W'; '（除首尾端点）'};
+
+            % Create ButtonTipsFShow
+            app.ButtonTipsFShow = uibutton(app.FertilizingTab, 'push');
+            app.ButtonTipsFShow.ButtonPushedFcn = createCallbackFcn(app, @ButtonTipsFShowPushed, true);
+            app.ButtonTipsFShow.Tag = 'inputexcel';
+            app.ButtonTipsFShow.FontName = '华文中宋';
+            app.ButtonTipsFShow.FontSize = 21;
+            app.ButtonTipsFShow.FontColor = [0.502 0.502 0.502];
+            app.ButtonTipsFShow.Visible = 'off';
+            app.ButtonTipsFShow.Tooltip = {'单击即可返回'};
+            app.ButtonTipsFShow.Position = [75 29 1058 581];
+            app.ButtonTipsFShow.Text = {'欢迎来到【Fertilizing】施肥界面！'; '在本页你可以完成光顺的前处理！（强烈建议好好设置一下！）'; ''; '光顺设置有两种：'; '1.【默认设置】'; '就是你直接看到的这个界面。你可以调整q1和qn，以及均一的Wi（除首尾两端点）'; '默认时，q1 qn W1 Wn均为1000'; '所以默认条件其实是fixed第一个与最后一个型值点，并试图限定进流角和去流角不变'; '如果不想限定进流角与去流角，减小q1qn即可'; ''; '2.【高级光顺】'; '当然啦很多情况下（尤其是初步设计阶段）最重要的不是第一个与最后一个型值点'; '此时单击”高级光顺“按钮即可逐个输入各型值点的Wi，默认为全为1（包括首尾两点！）'; 'Wi越大，说明该点原始型值越重要，最后光顺曲线中该点偏离也会越小，该点越趋近于固定点。'; 'q设置同普通光顺'; ''; '此外S是光顺迭代值，建议设置为从1开始。'; '在下一页的光顺中，每次S将会按上一次S的两倍进行迭代，具体数学理论见计算书。'; ''; '（W、q、S参数的具体说明详见计算书。再次单击可以返回）'};
+
+            % Create OASISOASIS4
+            app.OASISOASIS4 = uiimage(app.FertilizingTab);
+            app.OASISOASIS4.ImageClickedFcn = createCallbackFcn(app, @OASISOASIS4ImageClicked, true);
+            app.OASISOASIS4.Visible = 'off';
+            app.OASISOASIS4.Position = [337 106 507 467];
+            app.OASISOASIS4.ImageSource = 'OASIS表格用.png';
+
+            % Create OASISTab
+            app.OASISTab = uitab(app.TabGroup);
+            app.OASISTab.Title = 'OASIS!';
+
+            % Create FinalAxes
+            app.FinalAxes = uiaxes(app.OASISTab);
+            title(app.FinalAxes, {'拟合与光顺显示'; ''})
+            xlabel(app.FinalAxes, 'X')
+            ylabel(app.FinalAxes, 'Y')
+            app.FinalAxes.FontName = '华文中宋';
+            app.FinalAxes.FontSize = 21;
+            app.FinalAxes.TitleFontWeight = 'bold';
+            app.FinalAxes.Position = [416 100 745 481];
+
+            % Create TableFinal
+            app.TableFinal = uitable(app.OASISTab);
+            app.TableFinal.ColumnName = {'x'; 'y'; 'yg'};
+            app.TableFinal.Tooltip = {'当前型值点数据'};
+            app.TableFinal.Tag = 'handy';
+            app.TableFinal.FontName = 'Century Gothic';
+            app.TableFinal.Position = [47 101 322 481];
+
+            % Create ButtonShowData
+            app.ButtonShowData = uibutton(app.OASISTab, 'push');
+            app.ButtonShowData.ButtonPushedFcn = createCallbackFcn(app, @ButtonShowDataPushed, true);
+            app.ButtonShowData.FontName = '华文中宋';
+            app.ButtonShowData.FontSize = 21;
+            app.ButtonShowData.FontColor = [0.502 0.502 0.502];
+            app.ButtonShowData.Tooltip = {'单击在表中显示型值'};
+            app.ButtonShowData.Position = [100 29 215 47];
+            app.ButtonShowData.Text = '显示当前型值数据';
+
+            % Create ButtonShowPoints
+            app.ButtonShowPoints = uibutton(app.OASISTab, 'push');
+            app.ButtonShowPoints.ButtonPushedFcn = createCallbackFcn(app, @ButtonShowPointsPushed, true);
+            app.ButtonShowPoints.FontName = '华文中宋';
+            app.ButtonShowPoints.FontSize = 21;
+            app.ButtonShowPoints.FontColor = [0.502 0.502 0.502];
+            app.ButtonShowPoints.Tooltip = {'单击显示型值'};
+            app.ButtonShowPoints.Position = [518 29 146 47];
+            app.ButtonShowPoints.Text = '画出型值点';
+
+            % Create ButtonShowFit
+            app.ButtonShowFit = uibutton(app.OASISTab, 'push');
+            app.ButtonShowFit.ButtonPushedFcn = createCallbackFcn(app, @ButtonShowFitPushed, true);
+            app.ButtonShowFit.FontName = '华文中宋';
+            app.ButtonShowFit.FontSize = 21;
+            app.ButtonShowFit.FontColor = [0.502 0.502 0.502];
+            app.ButtonShowFit.Tooltip = {'单击画出拟合图线'};
+            app.ButtonShowFit.Position = [688 29 146 47];
+            app.ButtonShowFit.Text = '拟合';
+
+            % Create ButtonTipsFinal
+            app.ButtonTipsFinal = uibutton(app.OASISTab, 'push');
+            app.ButtonTipsFinal.ButtonPushedFcn = createCallbackFcn(app, @ButtonTipsFinalPushed, true);
+            app.ButtonTipsFinal.BackgroundColor = [0.9608 0.9608 0.9608];
+            app.ButtonTipsFinal.FontName = 'Times New Roman';
+            app.ButtonTipsFinal.FontSize = 21;
+            app.ButtonTipsFinal.FontWeight = 'bold';
+            app.ButtonTipsFinal.FontColor = [0.702 0.902 0.502];
+            app.ButtonTipsFinal.Tooltip = {'单击显示本页操作说明'};
+            app.ButtonTipsFinal.Position = [360 29 120 47];
+            app.ButtonTipsFinal.Text = 'TIPS';
+
+            % Create ButtonClear
+            app.ButtonClear = uibutton(app.OASISTab, 'push');
+            app.ButtonClear.ButtonPushedFcn = createCallbackFcn(app, @ButtonClearPushed, true);
+            app.ButtonClear.FontName = '华文中宋';
+            app.ButtonClear.FontSize = 21;
+            app.ButtonClear.FontColor = [0.9412 0.0745 0.0745];
+            app.ButtonClear.Tooltip = {'【危】！单机清空绘图界面'};
+            app.ButtonClear.Position = [1028 29 146 47];
+            app.ButtonClear.Text = '清空绘图区';
+
+            % Create OASIS3
+            app.OASIS3 = uiimage(app.OASISTab);
+            app.OASIS3.Position = [81 211 247 226];
+            app.OASIS3.ImageSource = 'OASIS表格用.png';
+
+            % Create OASIS4
+            app.OASIS4 = uiimage(app.OASISTab);
+            app.OASIS4.Position = [662 209 296 255];
+            app.OASIS4.ImageSource = 'OASIS表格用.png';
+
+            % Create ButtonShowSmooth
+            app.ButtonShowSmooth = uibutton(app.OASISTab, 'push');
+            app.ButtonShowSmooth.ButtonPushedFcn = createCallbackFcn(app, @ButtonShowSmoothPushed, true);
+            app.ButtonShowSmooth.FontName = '华文中宋';
+            app.ButtonShowSmooth.FontSize = 21;
+            app.ButtonShowSmooth.FontColor = [0.502 0.502 0.502];
+            app.ButtonShowSmooth.Tooltip = {'单击显示光顺曲线与型值'};
+            app.ButtonShowSmooth.Position = [858 29 146 47];
+            app.ButtonShowSmooth.Text = '光顺';
+
+            % Create ButtonTipsFinalShow
+            app.ButtonTipsFinalShow = uibutton(app.OASISTab, 'push');
+            app.ButtonTipsFinalShow.ButtonPushedFcn = createCallbackFcn(app, @ButtonTipsFinalShowPushed, true);
+            app.ButtonTipsFinalShow.BackgroundColor = [0.9608 0.9608 0.9608];
+            app.ButtonTipsFinalShow.FontName = '华文中宋';
+            app.ButtonTipsFinalShow.FontSize = 21;
+            app.ButtonTipsFinalShow.FontColor = [0.502 0.502 0.502];
+            app.ButtonTipsFinalShow.Visible = 'off';
+            app.ButtonTipsFinalShow.Tooltip = {'单击返回'};
+            app.ButtonTipsFinalShow.Position = [23 7 1168 637];
+            app.ButtonTipsFinalShow.Text = {'WoW！！OASIS长成了！！'; ''; '这是一个结果显示页面，非常简单，看文字点击即可。'; '建议从左到右依次点击（当然除了TIPS哈哈哈）不过乱序点击也是没有问题的！'; ''; '数据表中xy为原始型值，yg为光顺后型值。'; '画图区支持缩放与滚动，还可以查看线条上每个点（不只是型值点！）的具体坐标'; '重新导入型值之后记得清空原有绘图区再画图。'; ''; '如果想查询最后迭代完成时的参量S，可以点击完“光顺‘按钮后返回上一页【Fertilizing】界面查看。'; '将S取log2即可知迭代次数。'; '（什么？为什么不在本页设置？因为我懒啊！）'; ''; '最后，本程序已经经过了很多很多五花八门的型线检验2333'; '所以如果结果不太满意多半是因为你肥料界面光顺条件没有设置好:( 记得回去改一改哦'; '如果还有问题，请随时电话联系18018592118 or Email zhangziwen@sjtu.edu.cn'; '我会非常愿意解决您的问题/完善我的程序。'; ''; '最后的最后'; '“我们从荒漠中来，为交大校园文艺圆一片绿洲之梦”'; '欢迎关注交大AC艺术中心与绿洲音乐节'; '（夹带私货哈哈哈）'};
+
+            % Create OASISOASIS5
+            app.OASISOASIS5 = uiimage(app.OASISTab);
+            app.OASISOASIS5.ImageClickedFcn = createCallbackFcn(app, @OASISOASIS5ImageClicked, true);
+            app.OASISOASIS5.Visible = 'off';
+            app.OASISOASIS5.Position = [337 106 507 467];
+            app.OASISOASIS5.ImageSource = 'OASIS表格用.png';
+
+            % Show the figure after all components are created
+            app.UIFigure.Visible = 'on';
+        end
+    end
+
+    % App creation and deletion
+    methods (Access = public)
+
+        % Construct app
+        function app = splinesoasis
+
+            % Create UIFigure and components
+            createComponents(app)
+
+            % Register the app with App Designer
+            registerApp(app, app.UIFigure)
+
+            if nargout == 0
+                clear app
+            end
+        end
+
+        % Code that executes before app deletion
+        function delete(app)
+
+            % Delete UIFigure when app is deleted
+            delete(app.UIFigure)
+        end
+    end
+end
